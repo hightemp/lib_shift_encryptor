@@ -11,6 +11,9 @@ mod tests {
             let oData: Vec<u8> = String::from("test_pass").as_mut_vec().to_vec();
             let mut oResult: Vec<u8> = Vec::new();
 
+            println!("sKey = {:?}", sKey);
+            println!("oData = {:?}", oData);    
+
             let iResult = lib_shift_encryptor::fnEncrypt(sKey, oData, &mut oResult);
 
             println!("iResult = {:?}", iResult);
