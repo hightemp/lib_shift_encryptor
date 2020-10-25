@@ -4,16 +4,15 @@ Rust encryption library.
 
 ## Build
 
-```
+```console
 ./build.sh
 ```
 
 ## Test
 
-```
+```console
 ./test.sh
 ```
-
 
 ## Usage
 
