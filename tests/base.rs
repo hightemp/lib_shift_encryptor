@@ -1,40 +1,42 @@
-#![allow(non_snake_case)]
-
-// use lib_shift_encryptor::fnEncrypt;
-
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_fnEncrypt_and_fnDecrypt() {
-        unsafe {
-            let sKey: String = String::from("test_pass");
-            let oData: Vec<u8> = String::from("test_pass").as_mut_vec().to_vec();
-            let mut oEncryptResult: Vec<u8> = Vec::new();
-            let mut oDecryptResult: Vec<u8> = Vec::new();
+    fn test_encryption_and_decryption() {
+        let key = String::from("test_pass");
+        let data = String::from("Long text with repeated data lll repeated data").into_bytes();
+        let mut encrypted_result = Vec::new();
+        let mut decrypted_result = Vec::new();
 
-            println!("sKey = {:?}", sKey);
-            println!("oData = {:?}", oData);    
-            println!("oData.len() = {:?}", oData.len());    
+        println!("Key: {:?}", key);
+        println!("Original data: {:?}", data);    
+        println!("Original data length: {:?}", data.len());    
 
-            println!("> {:?}", "fnEncrypt");
-            let iEncryptResult = lib_shift_encryptor::fnEncrypt(sKey.clone(), oData, &mut oEncryptResult);
+        println!("Encrypting data...");
+        let encrypt_result = lib_shift_encryptor::encrypt(
+            key.clone(), 
+            data, 
+            &mut encrypted_result
+        );
 
-            println!("iEncryptResult = {:?}", iEncryptResult);
-            println!("oEncryptResult = {:?}", oEncryptResult);
-            println!("oEncryptResult.len() = {:?}", oEncryptResult.len());    
+        println!("Encryption result code: {:?}", encrypt_result);
+        println!("Encrypted data: {:?}", encrypted_result);
+        println!("Encrypted data length: {:?}", encrypted_result.len());    
 
-            println!("> {:?}", "fnDecrypt");
-            let iDecryptResult = lib_shift_encryptor::fnDecrypt(sKey.clone(), oEncryptResult, &mut oDecryptResult);
+        println!("Decrypting data...");
+        let decrypt_result = lib_shift_encryptor::decrypt(
+            key.clone(), 
+            encrypted_result, 
+            &mut decrypted_result
+        );
 
-            println!("iDecryptResult = {:?}", iDecryptResult);
-            println!("oDecryptResult = {:?}", oDecryptResult);
-            println!("oDecryptResult.len() = {:?}", oDecryptResult.len());    
+        println!("Decryption result code: {:?}", decrypt_result);
+        println!("Decrypted data: {:?}", decrypted_result);
+        println!("Decrypted data length: {:?}", decrypted_result.len());    
 
-            let sResult = String::from_utf8(oDecryptResult).expect("Found invalid UTF-8");
-            println!("sResult = {:?}", sResult);
-
-            // println!("sResult = {:?}", sResult);
-            // assert_eq!(0);
-        }
+        let decrypted_string = String::from_utf8(decrypted_result)
+            .expect("Failed to convert decrypted data to UTF-8 string");
+        println!("Decrypted string: {:?}", decrypted_string);
     }
 }

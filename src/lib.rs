@@ -1,313 +1,160 @@
-#![feature(log_syntax)]
-#![allow(non_snake_case)]
-#![allow(unused_variables)]
+// #![feature(log_syntax)]
 
-#[macro_use]
-extern crate lazy_static;
-
-// #![feature(trace_macros)]
-// trace_macros!(true);
-
+use lazy_static::lazy_static;
 use std::vec::Vec;
 
-pub const RESULT_ERROR_EMPTY_PASSWORD: i8 = -1;
-pub const RESULT_ERROR_DATA_IS_EMPTY: i8 = -2;
-pub const RESULT_ERROR_WRONG_PASSWORD: i8 = -3;
-pub const RESULT_SUCCESS: i8 = 1;
+const RESULT_ERROR_EMPTY_PASSWORD: i8 = -1;
+const RESULT_ERROR_DATA_IS_EMPTY: i8 = -2;
+const RESULT_ERROR_WRONG_PASSWORD: i8 = -3;
+const RESULT_SUCCESS: i8 = 1;
 
 lazy_static! {
-    // static ref GLOBAL_STRING: RwLock<String> = RwLock::new("string".to_string());
     static ref METHODS: Vec<u8> = vec![0, 4, 1, 4, 2, 4, 3, 4];
+    static ref MAGIC_NUMBERS: Vec<u8> = vec![3, 5, 44, 77];    
 }
 
-pub type TResult = i8;
-pub type TByteArray = Vec<u8>;
+type Result = i8;
+type ByteArray = Vec<u8>;
 
-pub fn fnEncrypt(sKey: String, oData: TByteArray, oResult: &mut TByteArray) -> TResult
-{
-    if sKey.len() == 0 {
+pub fn encrypt(key: String, data: ByteArray, result: &mut ByteArray) -> Result {
+    if key.is_empty() {
         return RESULT_ERROR_EMPTY_PASSWORD;
     }
-    if oData.len() == 0 {
+    if data.is_empty() {
         return RESULT_ERROR_DATA_IS_EMPTY;
     }
 
-    unsafe {
-        let iRounds: i8 = 1;
-        let oKeyByteArray: TByteArray = sKey.clone().as_mut_vec().to_vec();
+    let rounds: i8 = 1;
+    let key_bytes: ByteArray = key.clone().into_bytes();
 
-        *oResult = oData.clone();
+    *result = data.clone();
+    result.splice(0..0, MAGIC_NUMBERS.iter().cloned());
 
-        oResult.splice(0..0, oKeyByteArray.iter().cloned());
-
-        for iRoundIndex in 0..iRounds {
-            for iKeyIndex in 0..oKeyByteArray.len() {
-                let aiMethods = METHODS.to_vec();
-
-                for iMethodIndex in 0..aiMethods.len() {
-                    let iLineLength: usize = (oKeyByteArray[iKeyIndex] % 10 + 5) as usize;
-                    let mut cByte: u8;
-
-                    match aiMethods[iMethodIndex] {
-                        0 => {
-                            let uiSize = (oResult.len() as f64/iLineLength as f64).ceil() as usize;
-                            for iLineIndex in 0..uiSize {
-                                fnLeftByteShift(oResult, iLineIndex, iLineLength, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                            }
-                        }
-                        1 => {
-                            let uiSize = (oResult.len() as f64/iLineLength as f64).ceil() as usize;
-                            for iLineIndex in 0..uiSize {
-                                fnRightByteShift(oResult, iLineIndex, iLineLength, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                            }
-                        }
-                        2 => {
-                            for iIndex in 0..oResult.len() {
-                                cByte = oResult[iIndex];
-                                fnLeftBitShift(&mut cByte, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                                oResult[iIndex] = cByte;
-                            }
-                        }
-                        3 => {
-                            for iIndex in 0..oResult.len() {
-                                cByte = oResult[iIndex];
-                                fnRightBitShift(&mut cByte, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                                oResult[iIndex] = cByte;
-                            }
-                        }
-                        4 => {
-                            for iIndex in 0..oResult.len() {
-                                oResult[iIndex] = oResult[iIndex] ^ oKeyByteArray[(iIndex+iMethodIndex) % oKeyByteArray.len()];
-                            }
-                        }
-                        _ => {
-
-                        }
-                    }
+    for _ in 0..rounds {
+        for (_, &key_byte) in key_bytes.iter().enumerate() {
+            for (_, &method) in METHODS.iter().enumerate() {
+                match method {
+                    0 => {
+                        byte_shift(result, true, key_byte);
+                    },
+                    1 => {
+                        byte_shift(result, false, key_byte);
+                    },
+                    2 => {
+                        bit_shift(result, true, key_byte as usize);
+                    },
+                    3 => {
+                        bit_shift(result, false, key_byte as usize);
+                    },
+                    4 => {
+                        xor_bytes(result, &key_bytes);
+                    },
+                    _ => {}
                 }
             }
         }
     }
 
-    return RESULT_SUCCESS;
+    RESULT_SUCCESS
 }
 
-pub fn fnDecrypt(sKey: String, oData: TByteArray, oResult: &mut TByteArray) -> TResult 
-{
-    if sKey.len() == 0 {
+pub fn decrypt(key: String, data: ByteArray, result: &mut ByteArray) -> Result {
+    if key.is_empty() {
         return RESULT_ERROR_EMPTY_PASSWORD;
     }
-    if oData.len() == 0 {
+    if data.is_empty() {
         return RESULT_ERROR_DATA_IS_EMPTY;
     }
 
-    unsafe {
-        let iRounds = 1;
-        let oKeyByteArray: TByteArray = sKey.clone().as_mut_vec().to_vec();
+    let rounds = 1;
+    let key_bytes: ByteArray = key.clone().into_bytes();
 
-        *oResult = oData.clone();
+    *result = data.clone();
 
-        for iRoundIndex in 0..iRounds {
-            for iKeyIndex in (0..oKeyByteArray.len()).rev() {
-                let aiMethods = METHODS.to_vec();
+    for _ in 0..rounds {
+        for key_idx in (0..key_bytes.len()).rev() {
+            for method_idx in (0..METHODS.len()).rev() {
+                let key_byte = key_bytes[key_idx];
 
-                for iMethodIndex in (0..aiMethods.len()).rev() {
-                    let iLineLength: usize = (oKeyByteArray[iKeyIndex] % 10 + 5) as usize;
-                    let mut cByte: u8;
-
-                    match aiMethods[iMethodIndex] {
-                        1 => {
-                            let uiSize = (oResult.len() as f64/iLineLength as f64).ceil() as usize;
-                            for iLineIndex in 0..uiSize {
-                                fnLeftByteShift(oResult, iLineIndex, iLineLength, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                            }
-                        }
-                        0 => {
-                            let uiSize = (oResult.len() as f64/iLineLength as f64).ceil() as usize;
-                            for iLineIndex in 0..uiSize {
-                                fnRightByteShift(oResult, iLineIndex, iLineLength, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                            }
-                        }
-                        3 => {
-                            for iIndex in 0..oResult.len() {
-                                cByte = oResult[iIndex];
-                                fnLeftBitShift(&mut cByte, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                                oResult[iIndex] = cByte;
-                            }
-                        }
-                        2 => {
-                            for iIndex in 0..oResult.len() {
-                                cByte = oResult[iIndex];
-                                fnRightBitShift(&mut cByte, oKeyByteArray[iKeyIndex] as usize+iMethodIndex as usize);
-                                oResult[iIndex] = cByte;
-                            }
-                        }
-                        4 => {
-                            for iIndex in 0..oResult.len() {                            
-                                oResult[iIndex] = oResult[iIndex] ^ oKeyByteArray[(iIndex+iMethodIndex) % oKeyByteArray.len()];
-                            }
-                        }
-                        _ => {
-
-                        }
-                    }
+                match METHODS[method_idx] {
+                    1 => {
+                        byte_shift(result, true, key_byte);
+                    },
+                    0 => {
+                        byte_shift(result, false, key_byte);
+                    },
+                    3 => {
+                        bit_shift(result, true, key_byte as usize);
+                    },
+                    2 => {
+                        bit_shift(result, false, key_byte as usize);                        
+                    },
+                    4 => {
+                        xor_bytes(result, &key_bytes);
+                    },
+                    _ => {}
                 }
             }
         }
-
-        let oExtractedKeyByteArray: TByteArray = oResult.drain(0..sKey.len()).collect();
-        let sExtractedKey = String::from_utf8(oExtractedKeyByteArray).unwrap();
-
-        if sExtractedKey.eq(&sKey) {
-            return RESULT_ERROR_WRONG_PASSWORD;
-        }
     }
 
-    return RESULT_SUCCESS;
+    let extracted_numbers = result.drain(0..MAGIC_NUMBERS.len()).collect::<Vec<u8>>();
+    
+    if extracted_numbers != Vec::from(MAGIC_NUMBERS.as_slice()) {
+        return RESULT_ERROR_WRONG_PASSWORD;
+    }    
+
+    RESULT_SUCCESS
 }
 
-fn fnLeftByteShift(oData: &mut TByteArray, iLineNumber: usize, iLineLength: usize, iShift: usize) {
-    let iLinesCount: usize = oData.len() / iLineLength;
-    let iAllLinesCount: usize = (oData.len() as f64/ iLineLength as f64).ceil() as usize;
-
-    let iLineNumberRounded = iLineNumber % iAllLinesCount;
-    let mut iShiftRounded = iShift;
-
-    let iPosition: usize = iLineNumberRounded*iLineLength;
-    let iNextLinePosition: usize = (iLineNumberRounded+1)*iLineLength;
-
-    // println!("{:?}", "--------------------------------");
-    // println!("oData.len() = {:?}", oData.len());
-    // println!("iLinesCount = {:?}", iLinesCount);
-    // println!("iAllLinesCount = {:?}", iAllLinesCount);
-    // println!("iLineNumberRounded = {:?}", iLineNumberRounded);
-    // println!("iShiftRounded = {:?}", iShiftRounded);
-    // println!("iPosition = {:?}", iPosition);
-    // println!("iNextLinePosition = {:?}", iNextLinePosition);
-
-    if iNextLinePosition>oData.len() {
-        // let mut iCurrentLineLength = oData.len() % iPosition + 1;
-        let iCurrentLineLength = oData.len() % iLineLength;
-        iShiftRounded = iShiftRounded % iCurrentLineLength;
-
-        // println!("{:?}", "1 --------------------------------");
-        // println!("iCurrentLineLength = {:?}", iCurrentLineLength);
-        // println!("iShiftRounded = {:?}", iShiftRounded);
-
-        if iShiftRounded==0 {
-            return;
-        }
-
-        if iCurrentLineLength==1 {
-            return;
-        }
-
-        for iIndex in 0..iShiftRounded {
-            let iTemp: u8 = oData[iPosition];
-
-            // println!("{:?}", "1.1 --------------------------------");
-            // println!("iPosition+1 = {:?}", iPosition+1);
-            // println!("iPosition+iCurrentLineLength = {:?}", iPosition+iCurrentLineLength);
-
-            for iShiftIndex in iPosition+1..iPosition+iCurrentLineLength {
-                oData[iShiftIndex-1] = oData[iShiftIndex];
-            }
-
-            // println!("iPosition+iCurrentLineLength-1 = {:?}", iPosition+iCurrentLineLength-1);
-
-            oData[iPosition+iCurrentLineLength-1] = iTemp;
-        }
-    } else {
-        iShiftRounded = iShiftRounded % iLineLength;
-
-        // println!("{:?}", "2 --------------------------------");
-        // println!("iShiftRounded = {:?}", iShiftRounded);
-
-        if iShiftRounded==0 {
-            return;
-        }
-
-        for iIndex in 0..iShiftRounded {
-            let iTemp: u8 = oData[iPosition];
-
-            // println!("{:?}", "2.1 --------------------------------");
-            // println!("iPosition+1 = {:?}", iPosition+1);
-            // println!("iNextLinePosition = {:?}", iNextLinePosition);
-
-            for iShiftIndex in iPosition+1..iNextLinePosition {
-                oData[iShiftIndex-1] = oData[iShiftIndex];
-            }
-
-            // println!("iNextLinePosition-1 = {:?}", iNextLinePosition-1);
-
-            oData[iNextLinePosition-1] = iTemp;
-        }
+fn xor_bytes(data: &mut ByteArray, key_bytes: &Vec<u8>) {
+    for (idx, byte) in data.iter_mut().enumerate() {
+        *byte ^= key_bytes[idx % key_bytes.len()];
     }
 }
 
-fn fnRightByteShift(oData: &mut TByteArray, iLineNumber: usize, iLineLength: usize, iShift: usize) {
-    let iLinesCount: usize = oData.len() / iLineLength;
-    let iAllLinesCount: usize = (oData.len() as f64/ iLineLength as f64).ceil() as usize;
-
-    let iLineNumberRounded = iLineNumber % iAllLinesCount;
-    let mut iShiftRounded = iShift;
-
-    let iPosition: usize = iLineNumberRounded*iLineLength;
-    let iNextLinePosition: usize = (iLineNumberRounded+1)*iLineLength;
-
-    if iNextLinePosition>oData.len() {
-        // let mut iCurrentLineLength = oData.len() % iPosition + 1;
-        let iCurrentLineLength = oData.len() % iLineLength;
-        iShiftRounded = iShiftRounded % iCurrentLineLength;
-
-        if iShiftRounded==0 {
-            return;
-        }
-
-        if iCurrentLineLength==1 {
-            return;
-        }
-
-        for iIndex in 0..iShiftRounded {
-            let iTemp: u8 = oData[iPosition+iCurrentLineLength-1];
-            for iShiftIndex in iPosition+iCurrentLineLength-2..iPosition {
-                oData[iShiftIndex+1] = oData[iShiftIndex];
-            }
-            oData[iPosition] = iTemp;
-        }
-    } else {
-        iShiftRounded = iShiftRounded % iLineLength;
-
-        if iShiftRounded==0 {
-            return;
-        }
-
-        for iIndex in 0..iShiftRounded {
-            let iTemp: u8 = oData[iNextLinePosition-1];
-            for iShiftIndex in iNextLinePosition-2..iPosition {
-                oData[iShiftIndex+1] = oData[iShiftIndex];
-            }
-            oData[iPosition] = iTemp;
-        }
-    }
-}
-
-fn fnLeftBitShift(ucByte: &mut u8, iShift: usize) {
-    let iShiftRounded = iShift % 7 + 1;
-
-    if iShiftRounded==0 {
+fn rotate_slice(vec: &mut Vec<u8>, rotate_left: bool, mid: usize, start: usize, end: usize) {
+    if start >= end || end > vec.len() {
         return;
     }
 
-    *ucByte = (*ucByte << iShiftRounded) | (*ucByte >> (8 - iShiftRounded));
-}
-
-fn fnRightBitShift(ucByte: &mut u8, iShift: usize) {
-    let iShiftRounded = iShift % 7 + 1;
-
-    if iShiftRounded==0 {
-        return;
+    let slice = &vec[start..end];
+    let mut rotated_slice: Vec<u8> = Vec::from(slice);
+    let fmid = mid % rotated_slice.len();
+    
+    
+    if rotate_left {
+        rotated_slice.rotate_left(fmid);
+    } else {
+        rotated_slice.rotate_right(fmid);    
     }
 
-    *ucByte = (*ucByte >> iShiftRounded) | (*ucByte << (8 - iShiftRounded));
+    vec[start..end].copy_from_slice(&rotated_slice);
+}
+
+fn byte_shift(data: &mut ByteArray, rotate_left: bool, key_byte: u8) {
+    let line_length = (key_byte % 10 + 5) as usize;    
+
+    let lines_count = ((data.len() as f64) / (line_length as f64)).ceil() as usize;
+    
+    for line_number in 0..lines_count {
+        let position = line_number * line_length;
+        let mut next_line_position = (line_number + 1) * line_length;
+
+        if next_line_position>lines_count {
+            next_line_position = lines_count;
+        }
+
+        rotate_slice(data, rotate_left, key_byte as usize, position, next_line_position);
+    }
+}
+
+fn bit_shift(data: &mut ByteArray, rotate_left: bool, shift: usize) {
+    for byte in data.iter_mut() {
+        if rotate_left {
+            *byte = byte.rotate_left(shift as u32);
+        } else {
+            *byte = byte.rotate_right(shift as u32);
+        }
+    }
 }

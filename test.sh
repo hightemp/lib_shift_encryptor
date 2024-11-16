@@ -1,2 +1,2 @@
 #!/bin/bash
-cargo +nightly test -- --nocapture
+cargo test -- --nocapture

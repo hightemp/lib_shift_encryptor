@@ -1,2 +1,2 @@
 #!/bin/bash
-cargo +nightly build --lib
+cargo build --lib
