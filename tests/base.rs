@@ -5,7 +5,8 @@ mod tests {
     #[test]
     fn test_encryption_and_decryption() {
         let key = String::from("test_pass");
-        let data = String::from("Long text with repeated data lll repeated data").into_bytes();
+        let original_string = String::from("Long text with repeated data lll repeated data");
+        let data = original_string.clone().into_bytes();
         let mut encrypted_result = Vec::new();
         let mut decrypted_result = Vec::new();
 
@@ -38,5 +39,8 @@ mod tests {
         let decrypted_string = String::from_utf8(decrypted_result)
             .expect("Failed to convert decrypted data to UTF-8 string");
         println!("Decrypted string: {:?}", decrypted_string);
+
+        assert_eq!(decrypted_string.clone(), original_string.clone());
+
     }
 }
